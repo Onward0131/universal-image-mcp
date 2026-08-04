@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        shell: pwsh
+        run: npm ci
+
+      - name: Verify tag matches package version
+        shell: pwsh
+        run: |
+          $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
+          if ($env:GITHUB_REF_NAME -ne "v$version") {
+              throw "Tag $env:GITHUB_REF_NAME does not match package version v$version"
+          }
+
+      - name: Run offline tests
+        shell: pwsh
+        run: npm test
+
+      - name: Build release assets
+        shell: pwsh
+        run: npm run build:release
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $assets = Get-ChildItem -LiteralPath release -File |
+              Where-Object { $_.Name -match "\.zip(?:\.sha256)?$" } |
+              Sort-Object Name |
+              ForEach-Object { $_.FullName }
+          if ($assets.Count -ne 2) {
+              throw "Expected one ZIP and one ZIP SHA-256 file"
+          }
+          gh release create $env:GITHUB_REF_NAME @assets --verify-tag --generate-notes

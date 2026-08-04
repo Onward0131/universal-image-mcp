@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        node: [22, 24]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install locked dependencies
+        shell: pwsh
+        run: npm ci
+
+      - name: Run offline tests
+        shell: pwsh
+        run: npm test
+
+      # This job intentionally invokes the Windows-bundled 5.1 runtime because
+      # install.cmd falls back to it when PowerShell 7 is unavailable.
+      - name: Parse installer with Windows PowerShell 5.1
+        if: matrix.os == 'windows-latest' && matrix.node == 24
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path scripts/install.ps1),
+              [ref]$tokens,
+              [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+              throw ($errors | ForEach-Object Message | Out-String)
+          }
+
+      - name: Inspect npm package contents
+        shell: pwsh
+        run: npm pack --dry-run
+
+      - name: Audit production dependencies
+        shell: pwsh
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Build Windows release bundle
+        if: matrix.os == 'windows-latest' && matrix.node == 24
+        shell: pwsh
+        run: npm run build:release
+
+      - name: Download pinned managed Node.js archive
+        if: matrix.os == 'windows-latest' && matrix.node == 24
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "node-v24.19.0-win-x64.zip"
+          Invoke-WebRequest -UseBasicParsing `
+            -Uri "https://nodejs.org/dist/v24.19.0/node-v24.19.0-win-x64.zip" `
+            -OutFile $archive
+          $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne "57f71ab3652e797d84acddc79c81cc9ff1c6ddb2a1974cdb83f00fee9bff4c73") {
+            throw "Managed Node.js archive checksum mismatch"
+          }
+          "WAWAPI_NODE_ARCHIVE=$archive" >> $env:GITHUB_ENV
+
+      # GitHub-hosted runners do not guarantee a Codex installation. The smoke
+      # script therefore uses its local config-compatible Codex test shim by
+      # default; maintainers also run it with -UseInstalledCodex before release.
+      - name: Smoke-test no-Node installation with PowerShell 7
+        if: matrix.os == 'windows-latest' && matrix.node == 24
+        shell: pwsh
+        run: |
+          $releaseRoot = (Get-ChildItem -LiteralPath release -Directory -Filter "Wawapi-Image-MCP-v*" | Select-Object -First 1).FullName
+          .\scripts\test-windows-install.ps1 -ReleaseRoot $releaseRoot -NodeRuntimeArchive $env:WAWAPI_NODE_ARCHIVE
+
+      # This executes the complete installer under Windows PowerShell 5.1,
+      # matching install.cmd's fallback when pwsh is not installed.
+      - name: Smoke-test no-Node installation with Windows PowerShell 5.1
+        if: matrix.os == 'windows-latest' && matrix.node == 24
+        shell: powershell
+        run: |
+          $releaseRoot = (Get-ChildItem -LiteralPath release -Directory -Filter "Wawapi-Image-MCP-v*" | Select-Object -First 1).FullName
+          .\scripts\test-windows-install.ps1 -ReleaseRoot $releaseRoot -NodeRuntimeArchive $env:WAWAPI_NODE_ARCHIVE

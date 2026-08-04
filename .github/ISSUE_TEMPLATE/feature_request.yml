@@ -1,0 +1,40 @@
+name: Feature request
+description: Propose an improvement within the MCP and Codex Skill scope
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The project intentionally contains one stdio MCP server and one Codex Skill. Web apps, EXEs, graphical launchers, and separate end-user image CLIs are out of scope.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem is not handled today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Explain the MCP or Skill behavior, including billing and retry implications
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: checkboxes
+    id: contract
+    attributes:
+      label: Compatibility contract
+      options:
+        - label: The proposal keeps MCP tool results text-only.
+          required: true
+        - label: The proposal does not add automatic replay of ambiguously billable requests.
+          required: true

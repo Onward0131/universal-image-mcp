@@ -1,0 +1,86 @@
+name: Bug report
+description: Report a reproducible MCP, Skill, installer, or documentation problem
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Never paste an API Key, authorization header, `state/config.json`, private image, or unredacted personal path. Use private vulnerability reporting for security-sensitive problems.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - MCP tool
+        - Codex Skill
+        - Windows installer or uninstaller
+        - Release archive or checksum
+        - Documentation
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "1.3.0"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Windows version, Codex version and surface, installer PowerShell, and managed Node.js version. System Node.js is not required.
+      placeholder: "Windows 11; Codex desktop 0.x; Windows PowerShell 5.1; managed Node.js 24.19.0"
+    validations:
+      required: true
+
+  - type: input
+    id: error_code
+    attributes:
+      label: Redacted MCP or host error
+      description: Include only the stable error code, host timeout message, and HTTP status, not a raw upstream response
+      placeholder: "MCP error -32001: Request timed out; or upstream_channel_unavailable; HTTP 503"
+
+  - type: input
+    id: install_summary
+    attributes:
+      label: Redacted installer summary
+      description: Include ready, catalog_status, generation_channel_status, and MCP tool timeout only. Do not include a Key or personal path.
+      placeholder: "ready=true; catalog_status=verified; generation_channel_status=not_probed; MCP tool timeout=600 verified"
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest safe sequence that reproduces the problem
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Redact credentials, personal paths, prompts, images, and provider-account details
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I removed API Keys, authorization headers, private images, and identifying local paths.
+          required: true
+        - label: This report does not require private vulnerability handling.
+          required: true

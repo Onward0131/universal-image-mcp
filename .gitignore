@@ -1,0 +1,14 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+.idea/
+.venv-skill/
+.vscode/
+coverage/
+generated-images/
+node_modules/
+release/
+*.log
+*.tgz
+*.tmp

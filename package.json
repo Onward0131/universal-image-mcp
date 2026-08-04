@@ -1,0 +1,60 @@
+{
+  "name": "wawapi-image-mcp",
+  "version": "1.3.0",
+  "private": true,
+  "description": "Text-only stdio MCP server and Codex Skill for image generation through Wawapi",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "image-generation",
+    "mcp",
+    "model-context-protocol",
+    "openai-compatible",
+    "skill",
+    "stdio",
+    "text-only",
+    "wawapi"
+  ],
+  "main": "lib/bridge.js",
+  "files": [
+    "bin/wawapi-image-mcp.mjs",
+    "lib/bridge.js",
+    "lib/capabilities.js",
+    "lib/mcp-config.js",
+    "lib/image-api.js",
+    "lib/model-catalog.js",
+    "lib/storage.js",
+    "resources/capabilities.json",
+    "skills/wawapi-image/",
+    "scripts/mcp-doctor.mjs",
+    "CAPABILITIES.en.md",
+    "CAPABILITIES.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.en.md",
+    "README.md"
+  ],
+  "bin": {
+    "wawapi-image-mcp": "bin/wawapi-image-mcp.mjs"
+  },
+  "scripts": {
+    "test": "node --test",
+    "verify:installed": "node scripts/mcp-doctor.mjs",
+    "verify:live": "node scripts/live-mcp-smoke.mjs",
+    "build:release": "pwsh -NoLogo -NoProfile -File scripts/build-release.ps1"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "zod": "3.25.76"
+  },
+  "overrides": {
+    "hono": "4.12.34"
+  },
+  "bundleDependencies": [
+    "@modelcontextprotocol/sdk",
+    "zod"
+  ]
+}
