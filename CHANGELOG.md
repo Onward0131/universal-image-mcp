@@ -22,5 +22,6 @@
 - Redirects cannot forward API credentials, response sizes are bounded, and sensitive values are redacted from results.
 - Reference files are checked before loading; concurrent output names cannot overwrite existing files.
 - Updated locked production dependencies and audit gate.
+- Preserve UTF-8 Chinese installer text and JSON configuration under Windows PowerShell 5.1; verify uninstall ownership against the structured Codex registration.
 
 Previous versions remain available in repository tags and releases. Their installation names and implicit connection behavior are not retained in v2.0.0.

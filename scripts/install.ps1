@@ -104,7 +104,7 @@ function Test-OwnedInstallRoot([string]$Path) {
         }
     }
 
-    # Recognize the 1.0.x layout so existing users can safely update or uninstall.
+    # Recognize a package-managed layout when an installation marker is absent.
     $packageJsonPath = Join-Path $resolved "node_modules\universal-image-mcp\package.json"
     $commandPath = Join-Path $resolved "universal-image-mcp.cmd"
     if (
@@ -643,10 +643,21 @@ if ($Uninstall) {
             $previousCodexHome = $env:CODEX_HOME
             try {
                 $env:CODEX_HOME = $resolvedCodexHome
-                $mcpGet = Invoke-NativeCommand $codex.Source @("mcp", "get", "universal-image") -CaptureOutput
+                $mcpGet = Invoke-NativeCommand $codex.Source @("mcp", "get", "universal-image", "--json") -CaptureOutput
                 if ($mcpGet.exit_code -eq 0) {
                     $expectedMcpCommand = Join-Path $InstallRoot "universal-image-mcp.cmd"
-                    if (($mcpGet.output -join "`n").IndexOf($expectedMcpCommand, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                    $ownsRegistration = $false
+                    try {
+                        $registration = ($mcpGet.output -join "`n") | ConvertFrom-Json
+                        $ownsRegistration = (
+                            $registration.transport.type -eq "stdio" -and
+                            (Resolve-AbsolutePath ([string]$registration.transport.command)) -ieq (Resolve-AbsolutePath $expectedMcpCommand)
+                        )
+                    } catch {
+                        # Malformed or foreign registrations must never be removed.
+                        $ownsRegistration = $false
+                    }
+                    if ($ownsRegistration) {
                         $mcpRemove = Invoke-NativeCommand $codex.Source @("mcp", "remove", "universal-image")
                         if ($mcpRemove.exit_code -ne 0) {
                             throw "无法移除Codex MCP注册，退出码：$($mcpRemove.exit_code)"
