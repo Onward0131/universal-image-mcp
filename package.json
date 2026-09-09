@@ -1,8 +1,8 @@
 {
-  "name": "wawapi-image-mcp",
-  "version": "1.3.0",
+  "name": "universal-image-mcp",
+  "version": "2.0.0",
   "private": true,
-  "description": "Text-only stdio MCP server and Codex Skill for image generation through Wawapi",
+  "description": "Configurable multi-provider image generation and editing MCP for Codex",
   "license": "MIT",
   "keywords": [
     "codex",
@@ -13,35 +13,42 @@
     "skill",
     "stdio",
     "text-only",
-    "wawapi"
+    "gemini",
+    "openrouter"
   ],
   "main": "lib/bridge.js",
   "files": [
-    "bin/wawapi-image-mcp.mjs",
+    "bin/universal-image-mcp.mjs",
     "lib/bridge.js",
     "lib/capabilities.js",
     "lib/mcp-config.js",
     "lib/image-api.js",
+    "lib/provider-protocol.js",
     "lib/model-catalog.js",
     "lib/storage.js",
-    "resources/capabilities.json",
-    "skills/wawapi-image/",
+    "skills/universal-image/",
     "scripts/mcp-doctor.mjs",
+    "scripts/check-config.mjs",
     "CAPABILITIES.en.md",
     "CAPABILITIES.md",
     "CHANGELOG.md",
     "LICENSE",
     "README.en.md",
-    "README.md"
+    "README.md",
+    "docs/PROVIDERS.md",
+    "docs/ASSESSMENT.md",
+    "examples/",
+    "docs/LIVE-TEST.md"
   ],
   "bin": {
-    "wawapi-image-mcp": "bin/wawapi-image-mcp.mjs"
+    "universal-image-mcp": "bin/universal-image-mcp.mjs"
   },
   "scripts": {
     "test": "node --test",
     "verify:installed": "node scripts/mcp-doctor.mjs",
     "verify:live": "node scripts/live-mcp-smoke.mjs",
-    "build:release": "pwsh -NoLogo -NoProfile -File scripts/build-release.ps1"
+    "build:release": "pwsh -NoLogo -NoProfile -File scripts/build-release.ps1",
+    "check:config": "node scripts/check-config.mjs"
   },
   "engines": {
     "node": ">=22"
@@ -51,10 +58,18 @@
     "zod": "3.25.76"
   },
   "overrides": {
-    "hono": "4.12.34"
+    "hono": "4.13.5"
   },
   "bundleDependencies": [
     "@modelcontextprotocol/sdk",
     "zod"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Onward0131/universal-image-mcp.git"
+  },
+  "homepage": "https://github.com/Onward0131/universal-image-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/Onward0131/universal-image-mcp/issues"
+  }
 }

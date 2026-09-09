@@ -14,7 +14,6 @@ const config = {
   baseUrl: "https://example.com/v1",
   apiKey: "secret",
   model: "gpt-image-2",
-  preferAsyncImages: false,
 };
 
 function referenceDataUrl(format = "png", size = 32, fill = 1) {
@@ -240,54 +239,16 @@ test("reference image size follows the provider 10 MB limit", () => {
   assert.throws(() => decodeReferenceImage({ dataUrl: rejected }), /10 MB/);
 });
 
-test("reference edits retry one explicit capacity rejection", async () => {
-  let calls = 0;
-  const fakeFetch = async () => {
-    calls += 1;
-    if (calls === 1) {
-      return new Response(JSON.stringify({ error: { message: "No available compatible accounts" } }), {
-        status: 503,
-        headers: { "content-type": "application/json" },
-      });
-    }
-    return new Response(JSON.stringify({ data: [{ b64_json: "aGVsbG8=" }] }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
+test("generation and editing never replay capacity failures", async () => {
+  for (const operation of ["generate", "edit"]) {
+    let calls = 0;
+    const client = createImageApi(config, async () => {
+      calls++;
+      return new Response(JSON.stringify({ error: { message: "No available compatible accounts" } }), { status: 503 });
     });
-  };
-  const client = createImageApi(config, fakeFetch);
-  const dataUrl = referenceDataUrl("png", 32, 3);
-  const result = await client.edit({
-    prompt: "retry test",
-    size: "2048x2048",
-    quality: "high",
-    referenceImage: { dataUrl, name: "source.png" },
-    retryDelayMs: 0,
-  });
-
-  assert.equal(calls, 2);
-  assert.equal(result.attempts, 2);
-});
-
-test("text generation retries one explicit capacity rejection", async () => {
-  let calls = 0;
-  const fakeFetch = async () => {
-    calls += 1;
-    if (calls === 1) {
-      return new Response(JSON.stringify({ error: { message: "No available compatible accounts" } }), {
-        status: 503,
-        headers: { "content-type": "application/json" },
-      });
-    }
-    return new Response(JSON.stringify({ data: [{ b64_json: "aGVsbG8=" }] }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
-  };
-  const client = createImageApi(config, fakeFetch);
-  const result = await client.generate({ prompt: "retry", retryDelayMs: 0 });
-  assert.equal(calls, 2);
-  assert.equal(result.attempts, 2);
+    await assert.rejects(client[operation]({ prompt: "single submission", maxRetries: 5, referenceImage: { dataUrl: referenceDataUrl("png"), name: "source.png" } }), { code: "upstream_channel_unavailable", attempts: 1 });
+    assert.equal(calls, 1);
+  }
 });
 
 test("channel-unavailable messages normalize across English and Chinese responses", async (t) => {
@@ -316,13 +277,13 @@ test("channel-unavailable messages normalize across English and Chinese response
       await assert.rejects(client.generate({ prompt: "channel test", retryDelayMs: 0 }), (error) => {
         assert.equal(error.code, "upstream_channel_unavailable");
         assert.equal(error.retryable, true);
-        assert.equal(error.attempts, 2);
+        assert.equal(error.attempts, 1);
         assert.match(error.nextActions.join("\n"), /渠道恢复/);
         assert.match(error.nextActions.join("\n"), /Key提供方/);
         assert.match(error.nextActions.join("\n"), /不要.*提示词/);
         return true;
       });
-      assert.equal(calls, 2);
+      assert.equal(calls, 1);
     });
   }
 });
@@ -418,7 +379,7 @@ test("reference edit multipart fields cover every supported size, quality, and f
           referenceImage: { dataUrl, name: "matrix.png" },
         });
         const form = forms.at(-1);
-        assert.equal(form.get("size"), size);
+        assert.equal(form.get("size"), size === "auto" ? null : size);
         assert.equal(form.get("quality"), quality);
         assert.equal(form.get("output_format"), outputFormat);
         assert.equal(form.get("image").name, "matrix.png");
@@ -436,7 +397,7 @@ test("client normalizes rejected resolution errors", async () => {
     status: 400,
     headers: { "content-type": "application/json" },
   });
-  const client = createImageApi({ ...config, preferAsyncImages: false }, fakeFetch);
+  const client = createImageApi(config, fakeFetch);
 
   await assert.rejects(
     client.generate({ prompt: "4k", size: "4096x4096", maxRetries: 0 }),
@@ -445,131 +406,6 @@ test("client normalizes rejected resolution errors", async () => {
       assert.equal(error.code, "unsupported_size");
       assert.equal(error.message, "上游不支持请求的图片尺寸");
       assert.equal(error.retryable, false);
-      return true;
-    },
-  );
-});
-
-test("client polls an enabled asynchronous image task", async () => {
-  const calls = [];
-  const fakeFetch = async (url, options) => {
-    calls.push({ url, options });
-    if (url.endsWith("/images/generations/async")) {
-      return new Response(JSON.stringify({ task_id: "imgtask_test", status: "processing" }), {
-        status: 202,
-        headers: { "content-type": "application/json", "retry-after": "0" },
-      });
-    }
-    if (url.endsWith("/images/tasks/imgtask_test") && calls.length === 2) {
-      return new Response(JSON.stringify({ task_id: "imgtask_test", status: "processing" }), {
-        status: 200,
-        headers: { "content-type": "application/json", "retry-after": "0" },
-      });
-    }
-    return new Response(JSON.stringify({
-      task_id: "imgtask_test",
-      status: "completed",
-      result: { data: [{ b64_json: "aGVsbG8=" }] },
-    }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
-  };
-  const client = createImageApi({ ...config, preferAsyncImages: true }, fakeFetch);
-  const result = await client.generate({ prompt: "async", pollIntervalMs: 0 });
-
-  assert.equal(result.transport, "async");
-  assert.equal(result.taskId, "imgtask_test");
-  assert.equal(result.pollCount, 2);
-  assert.equal(result.images[0].type, "base64");
-  assert.deepEqual(client.capabilities(), { asyncImages: true });
-  assert.equal(calls.filter((call) => call.url.includes("/images/generations")).length, 1);
-});
-
-test("client caches an unavailable async endpoint and falls back to sync", async () => {
-  const calls = [];
-  const fakeFetch = async (url) => {
-    calls.push(url);
-    if (url.endsWith("/async")) {
-      return new Response(JSON.stringify({
-        error: { code: "not_found_error", message: "async image tasks are not enabled" },
-      }), {
-        status: 404,
-        headers: { "content-type": "application/json" },
-      });
-    }
-    return new Response(JSON.stringify({ data: [{ b64_json: "aGVsbG8=" }] }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
-  };
-  const client = createImageApi({ ...config, preferAsyncImages: true }, fakeFetch);
-
-  const first = await client.generate({ prompt: "first" });
-  const second = await client.generate({ prompt: "second" });
-  assert.equal(first.transport, "sync");
-  assert.equal(second.transport, "sync");
-  assert.deepEqual(client.capabilities(), { asyncImages: false });
-  assert.equal(calls.filter((url) => url.endsWith("/async")).length, 1);
-  assert.equal(calls.filter((url) => url.endsWith("/images/generations")).length, 2);
-});
-
-test("reference edits reuse multipart data after async fallback", async () => {
-  const calls = [];
-  const fakeFetch = async (url, options) => {
-    calls.push({ url, options });
-    if (url.endsWith("/images/edits/async")) {
-      return new Response(JSON.stringify({
-        error: { code: "not_found_error", message: "async image tasks are not enabled" },
-      }), {
-        status: 404,
-        headers: { "content-type": "application/json" },
-      });
-    }
-    return new Response(JSON.stringify({ data: [{ b64_json: "aGVsbG8=" }] }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
-  };
-  const client = createImageApi({ ...config, preferAsyncImages: true }, fakeFetch);
-  const result = await client.edit({
-    prompt: "edit fallback",
-    referenceImage: { dataUrl: referenceDataUrl("png"), name: "source.png" },
-  });
-
-  assert.equal(result.transport, "sync");
-  assert.equal(calls.length, 2);
-  assert.ok(calls[0].options.body instanceof FormData);
-  assert.ok(calls[1].options.body instanceof FormData);
-  assert.equal(calls[1].options.body.get("image").name, "source.png");
-});
-
-test("async task failures preserve upstream error details", async () => {
-  const fakeFetch = async (url) => {
-    if (url.endsWith("/images/generations/async")) {
-      return new Response(JSON.stringify({ task_id: "imgtask_failed", status: "processing" }), {
-        status: 202,
-        headers: { "content-type": "application/json", "retry-after": "0" },
-      });
-    }
-    return new Response(JSON.stringify({
-      task_id: "imgtask_failed",
-      status: "failed",
-      http_status: 503,
-      error: { message: "No available compatible accounts", request_id: "req_async" },
-    }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
-  };
-  const client = createImageApi({ ...config, preferAsyncImages: true }, fakeFetch);
-
-  await assert.rejects(
-    client.generate({ prompt: "failure", pollIntervalMs: 0 }),
-    (error) => {
-      assert.equal(error.code, "upstream_channel_unavailable");
-      assert.equal(error.status, 503);
-      assert.equal(error.requestId, "req_async");
       return true;
     },
   );

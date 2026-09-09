@@ -1,10 +1,17 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [string]$PackagePath,
     [string]$ChecksumPath,
     [string]$InstallRoot,
     [string]$CodexHome,
     [string]$NodeRuntimeArchive,
+    [ValidateSet("openai", "openai-compatible", "gemini", "openrouter")]
+    [string]$Provider,
+    [string]$BaseUrl,
+    [string]$Model,
+    [ValidateSet("openai-images", "openai-chat", "gemini")]
+    [string]$ApiFormat,
+    [string]$ProviderConfigPath,
     [switch]$ResetApiKey,
     [switch]$SkipSkillInstall,
     [switch]$SkipMcpRegistration,
@@ -45,20 +52,20 @@ function Assert-SafeInstallRoot([string]$Path) {
     if ($resolved.TrimEnd("\") -eq $driveRoot.TrimEnd("\")) {
         throw "InstallRoot不能是驱动器根目录：$resolved"
     }
-    if ([System.IO.Path]::GetFileName($resolved.TrimEnd("\")) -ine "wawapi-image-mcp") {
-        throw "InstallRoot必须使用独立的wawapi-image-mcp目录：$resolved"
+    if ([System.IO.Path]::GetFileName($resolved.TrimEnd("\")) -ine "universal-image-mcp") {
+        throw "InstallRoot必须使用独立的universal-image-mcp目录：$resolved"
     }
     if ($resolved.Length -gt 100) {
-        throw "InstallRoot路径过长，Windows PowerShell 5.1无法可靠解压受管运行时。请使用较短路径，例如D:\CodexTools\wawapi-image-mcp。"
+        throw "InstallRoot路径过长，Windows PowerShell 5.1无法可靠解压受管运行时。请使用较短路径，例如D:\CodexTools\universal-image-mcp。"
     }
     return $resolved
 }
 
 function Get-DefaultInstallRoot {
     if (Test-Path -LiteralPath "D:\") {
-        return "D:\CodexTools\wawapi-image-mcp"
+        return "D:\CodexTools\universal-image-mcp"
     }
-    return Join-Path $env:LOCALAPPDATA "CodexTools\wawapi-image-mcp"
+    return Join-Path $env:LOCALAPPDATA "CodexTools\universal-image-mcp"
 }
 
 function Get-ResolvedCodexHome([string]$RequestedHome) {
@@ -73,7 +80,7 @@ function Get-ResolvedCodexHome([string]$RequestedHome) {
 }
 
 function Get-InstallMarkerPath([string]$Path) {
-    return Join-Path $Path ".wawapi-image-mcp-install.json"
+    return Join-Path $Path ".universal-image-mcp-install.json"
 }
 
 function Test-OwnedInstallRoot([string]$Path) {
@@ -87,7 +94,7 @@ function Test-OwnedInstallRoot([string]$Path) {
         try {
             $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json
             if (
-                [string]$marker.product -eq "wawapi-image-mcp" -and
+                [string]$marker.product -eq "universal-image-mcp" -and
                 (Resolve-AbsolutePath ([string]$marker.install_root)) -ieq $resolved
             ) {
                 return $true
@@ -98,15 +105,15 @@ function Test-OwnedInstallRoot([string]$Path) {
     }
 
     # Recognize the 1.0.x layout so existing users can safely update or uninstall.
-    $packageJsonPath = Join-Path $resolved "node_modules\wawapi-image-mcp\package.json"
-    $commandPath = Join-Path $resolved "wawapi-image-mcp.cmd"
+    $packageJsonPath = Join-Path $resolved "node_modules\universal-image-mcp\package.json"
+    $commandPath = Join-Path $resolved "universal-image-mcp.cmd"
     if (
         (Test-Path -LiteralPath $packageJsonPath -PathType Leaf) -and
         (Test-Path -LiteralPath $commandPath -PathType Leaf)
     ) {
         try {
             $packageInfo = Get-Content -LiteralPath $packageJsonPath -Raw | ConvertFrom-Json
-            return [string]$packageInfo.name -eq "wawapi-image-mcp"
+            return [string]$packageInfo.name -eq "universal-image-mcp"
         } catch {
             return $false
         }
@@ -123,13 +130,13 @@ function Assert-InstallRootAvailable([string]$Path) {
     if ($entries.Count -eq 0 -or (Test-OwnedInstallRoot $Path)) {
         return
     }
-    throw "InstallRoot已存在且不属于Wawapi Image MCP，请选择空的独立目录：$Path"
+    throw "InstallRoot已存在且不属于Universal Image MCP，请选择空的独立目录：$Path"
 }
 
 function Write-InstallMarker([string]$Path, [string]$Version, $RuntimeInfo, [string]$Status = "installed") {
     $markerPath = Get-InstallMarkerPath $Path
     $marker = [ordered]@{
-        product = "wawapi-image-mcp"
+        product = "universal-image-mcp"
         version = $Version
         status = $Status
         install_root = (Resolve-AbsolutePath $Path)
@@ -231,7 +238,7 @@ function Invoke-OfficialNodeDownload([string]$Uri, [string]$Destination) {
         Uri = $Uri
         OutFile = $Destination
         TimeoutSec = 180
-        Headers = @{ "User-Agent" = "wawapi-image-mcp-installer/1.3" }
+        Headers = @{ "User-Agent" = "universal-image-mcp-installer/1.3" }
     }
     Invoke-WebRequest @downloadParameters
 }
@@ -318,21 +325,21 @@ function Write-ManagedMcpLauncher([string]$Root, [string]$NodePath) {
     $resolvedNode = Assert-PathWithin $NodePath $resolvedRoot "受管Node.js路径"
     $prefix = $resolvedRoot.TrimEnd("\") + "\"
     $relativeNode = $resolvedNode.Substring($prefix.Length)
-    $launcherPath = Join-Path $resolvedRoot "wawapi-image-mcp.cmd"
+    $launcherPath = Join-Path $resolvedRoot "universal-image-mcp.cmd"
     $content = @"
 @echo off
 setlocal
-set "WAWAPI_NODE=%~dp0$relativeNode"
-set "WAWAPI_ENTRY=%~dp0node_modules\wawapi-image-mcp\bin\wawapi-image-mcp.mjs"
-if not exist "%WAWAPI_NODE%" (
-  echo Managed Node.js runtime is missing: %WAWAPI_NODE% 1>&2
+set "IMAGE_NODE=%~dp0$relativeNode"
+set "IMAGE_ENTRY=%~dp0node_modules\universal-image-mcp\bin\universal-image-mcp.mjs"
+if not exist "%IMAGE_NODE%" (
+  echo Managed Node.js runtime is missing: %IMAGE_NODE% 1>&2
   exit /b 1
 )
-if not exist "%WAWAPI_ENTRY%" (
-  echo Wawapi Image MCP entry point is missing: %WAWAPI_ENTRY% 1>&2
+if not exist "%IMAGE_ENTRY%" (
+  echo Universal Image MCP entry point is missing: %IMAGE_ENTRY% 1>&2
   exit /b 1
 )
-"%WAWAPI_NODE%" "%WAWAPI_ENTRY%" %*
+"%IMAGE_NODE%" "%IMAGE_ENTRY%" %*
 exit /b %ERRORLEVEL%
 "@
     [System.IO.File]::WriteAllText($launcherPath, $content, [System.Text.UTF8Encoding]::new($false))
@@ -415,15 +422,21 @@ function Read-MaskedValue([string]$Prompt) {
     }
 }
 
-function Write-ProtectedConfig([string]$StateRoot, [string]$ApiKey) {
+function Write-ProtectedConfig([string]$StateRoot, [string]$ApiKey, [hashtable]$ProviderSettings) {
     New-Item -ItemType Directory -Path $StateRoot -Force | Out-Null
     $aclHardened = Set-PrivateStateAcl $StateRoot
     $configPath = Join-Path $StateRoot "config.json"
     $tempPath = Join-Path $StateRoot (".config." + [guid]::NewGuid().ToString("N") + ".tmp")
     $backupPath = Join-Path $StateRoot (".config." + [guid]::NewGuid().ToString("N") + ".bak")
     try {
-        $json = [pscustomobject]@{ api_key = $ApiKey } | ConvertTo-Json
+        $settings = @{} + $ProviderSettings
+        if ($ApiKey) { $settings.api_key = $ApiKey }
+        $json = $settings | ConvertTo-Json -Depth 30
         [System.IO.File]::WriteAllText($tempPath, "$json`n", [System.Text.UTF8Encoding]::new($false))
+        $validation = Invoke-NativeCommand $runtime.node @((Join-Path $packageRoot "scripts\check-config.mjs"), $tempPath) -CaptureOutput
+        if ($validation.exit_code -ne 0) {
+            throw "供应商配置校验失败：$(($validation.output | ForEach-Object { [string]$_ }) -join ' ')"
+        }
         if (Test-Path -LiteralPath $configPath -PathType Leaf) {
             [System.IO.File]::Replace($tempPath, $configPath, $backupPath)
         } else {
@@ -502,7 +515,8 @@ function Invoke-NativeCommand(
 function Set-CodexMcpToolTimeout(
     [string]$ConfigPath,
     [string]$CodexCommand,
-    [int]$TimeoutSec
+    [int]$TimeoutSec,
+    [string[]]$EnvironmentVariables = @()
 ) {
     if ($TimeoutSec -lt 60 -or $TimeoutSec -gt 3600) {
         throw "Codex MCP工具超时必须在60到3600秒之间"
@@ -516,12 +530,12 @@ function Set-CodexMcpToolTimeout(
     $lines = @([System.Text.RegularExpressions.Regex]::Split($content, "\r?\n"))
     $sectionIndexes = @()
     for ($index = 0; $index -lt $lines.Count; $index++) {
-        if ($lines[$index].Trim() -eq "[mcp_servers.wawapi-image]") {
+        if ($lines[$index].Trim() -eq "[mcp_servers.universal-image]") {
             $sectionIndexes += $index
         }
     }
     if ($sectionIndexes.Count -ne 1) {
-        throw "无法唯一定位Codex中的[mcp_servers.wawapi-image]配置段"
+        throw "无法唯一定位Codex中的[mcp_servers.universal-image]配置段"
     }
 
     $sectionStart = $sectionIndexes[0] + 1
@@ -540,7 +554,7 @@ function Set-CodexMcpToolTimeout(
         }
     }
     if ($timeoutIndexes.Count -gt 1) {
-        throw "Codex的wawapi-image配置段包含重复tool_timeout_sec"
+        throw "Codex的universal-image配置段包含重复tool_timeout_sec"
     }
     if ($timeoutIndexes.Count -eq 1) {
         $lines[$timeoutIndexes[0]] = "tool_timeout_sec = $TimeoutSec"
@@ -554,8 +568,21 @@ function Set-CodexMcpToolTimeout(
         $lines = @($before + "tool_timeout_sec = $TimeoutSec" + $after)
     }
 
-    $temporaryPath = "$ConfigPath.wawapi-image-$([guid]::NewGuid().ToString('N')).tmp"
-    $backupPath = "$ConfigPath.wawapi-image-$([guid]::NewGuid().ToString('N')).bak"
+    # Codex filters inherited variables for stdio servers. Forward only names
+    # referenced by this provider, without copying credential values to TOML.
+    $forwardedNames = @($EnvironmentVariables | Sort-Object -Unique)
+    if (@($forwardedNames | Where-Object { $_ -notmatch '^[A-Za-z_][A-Za-z0-9_]*$' }).Count -gt 0) {
+        throw "供应商引用了无效的环境变量名称"
+    }
+    if ($forwardedNames.Count -gt 0) {
+        $environmentLine = "env_vars = " + (ConvertTo-Json -InputObject $forwardedNames -Compress)
+        $before = @($lines[0..($sectionStart - 1)])
+        $after = if ($sectionStart -lt $lines.Count) { @($lines[$sectionStart..($lines.Count - 1)]) } else { @() }
+        $lines = @($before + $environmentLine + $after)
+    }
+
+    $temporaryPath = "$ConfigPath.universal-image-$([guid]::NewGuid().ToString('N')).tmp"
+    $backupPath = "$ConfigPath.universal-image-$([guid]::NewGuid().ToString('N')).bak"
     try {
         [System.IO.File]::WriteAllText(
             $temporaryPath,
@@ -564,7 +591,7 @@ function Set-CodexMcpToolTimeout(
         )
         [System.IO.File]::Replace($temporaryPath, $ConfigPath, $backupPath)
 
-        $mcpGet = Invoke-NativeCommand $CodexCommand @("mcp", "get", "wawapi-image", "--json") -CaptureOutput
+        $mcpGet = Invoke-NativeCommand $CodexCommand @("mcp", "get", "universal-image", "--json") -CaptureOutput
         if ($mcpGet.exit_code -ne 0) {
             throw "Codex无法读取刚写入的MCP配置，退出码：$($mcpGet.exit_code)"
         }
@@ -573,11 +600,16 @@ function Set-CodexMcpToolTimeout(
         if ([int]$mcpConfig.tool_timeout_sec -ne $TimeoutSec) {
             throw "当前Codex未接受MCP工具超时配置。请更新Codex后重新运行安装器。"
         }
+        $actualNames = @($mcpConfig.transport.env_vars | Sort-Object -Unique)
+        if (($actualNames -join "|") -cne ($forwardedNames -join "|")) {
+            throw "当前Codex未保留供应商需要的环境变量转发配置"
+        }
 
         Remove-Item -LiteralPath $backupPath -Force
         return [pscustomobject]@{
             seconds = $TimeoutSec
             verified = $true
+            environment_variables = $forwardedNames
         }
     } catch {
         if (Test-Path -LiteralPath $backupPath -PathType Leaf) {
@@ -597,11 +629,11 @@ function Set-CodexMcpToolTimeout(
 $defaultInstallRoot = Assert-SafeInstallRoot (Get-DefaultInstallRoot)
 $InstallRoot = Assert-SafeInstallRoot $(if ($InstallRoot) { $InstallRoot } else { $defaultInstallRoot })
 $resolvedCodexHome = Get-ResolvedCodexHome $CodexHome
-$skillTarget = Join-Path (Join-Path $resolvedCodexHome "skills") "wawapi-image"
+$skillTarget = Join-Path (Join-Path $resolvedCodexHome "skills") "universal-image"
 
 if ($Uninstall) {
     if ((Test-Path -LiteralPath $InstallRoot) -and -not (Test-OwnedInstallRoot $InstallRoot)) {
-        throw "拒绝卸载：目标目录缺少有效的Wawapi Image MCP所有权标记：$InstallRoot"
+        throw "拒绝卸载：目标目录缺少有效的Universal Image MCP所有权标记：$InstallRoot"
     }
     $mcpRemoved = $false
     $mcpOwnershipMismatch = $false
@@ -611,11 +643,11 @@ if ($Uninstall) {
             $previousCodexHome = $env:CODEX_HOME
             try {
                 $env:CODEX_HOME = $resolvedCodexHome
-                $mcpGet = Invoke-NativeCommand $codex.Source @("mcp", "get", "wawapi-image") -CaptureOutput
+                $mcpGet = Invoke-NativeCommand $codex.Source @("mcp", "get", "universal-image") -CaptureOutput
                 if ($mcpGet.exit_code -eq 0) {
-                    $expectedMcpCommand = Join-Path $InstallRoot "wawapi-image-mcp.cmd"
+                    $expectedMcpCommand = Join-Path $InstallRoot "universal-image-mcp.cmd"
                     if (($mcpGet.output -join "`n").IndexOf($expectedMcpCommand, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
-                        $mcpRemove = Invoke-NativeCommand $codex.Source @("mcp", "remove", "wawapi-image")
+                        $mcpRemove = Invoke-NativeCommand $codex.Source @("mcp", "remove", "universal-image")
                         if ($mcpRemove.exit_code -ne 0) {
                             throw "无法移除Codex MCP注册，退出码：$($mcpRemove.exit_code)"
                         }
@@ -659,11 +691,11 @@ if ($Uninstall) {
 }
 
 if (-not $PackagePath) {
-    $candidate = Get-ChildItem -LiteralPath $PSScriptRoot -Filter "wawapi-image-mcp-*.tgz" -File |
+    $candidate = Get-ChildItem -LiteralPath $PSScriptRoot -Filter "universal-image-mcp-*.tgz" -File |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1
     if (-not $candidate) {
-        throw "安装器目录中没有wawapi-image-mcp-*.tgz"
+        throw "安装器目录中没有universal-image-mcp-*.tgz"
     }
     $PackagePath = $candidate.FullName
 }
@@ -690,26 +722,66 @@ $installMarker = Write-InstallMarker $InstallRoot "installing" $runtime "install
 
 $stateRoot = Join-Path $InstallRoot "state"
 $configPath = Join-Path $stateRoot "config.json"
+$providerSettings = @{}
+$connectionChanged = $false
+if (Test-Path -LiteralPath $configPath -PathType Leaf) {
+    $savedSettings = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+    foreach ($property in $savedSettings.PSObject.Properties) { $providerSettings[$property.Name] = $property.Value }
+}
+if ($ProviderConfigPath) {
+    $suppliedSettings = Get-Content -LiteralPath $ProviderConfigPath -Raw | ConvertFrom-Json
+    $providerSettings = @{}
+    foreach ($property in $suppliedSettings.PSObject.Properties) { $providerSettings[$property.Name] = $property.Value }
+    $connectionChanged = $true
+}
+if ($Friendly -and $providerSettings.Count -eq 0 -and -not $Provider -and -not $BaseUrl) {
+    $Provider = Read-Host "供应商(openai-compatible/openai/gemini/openrouter；回车使用openai-compatible)"
+    if (-not $Provider) { $Provider = "openai-compatible" }
+    if ($Provider -eq "openai-compatible") { $BaseUrl = Read-Host "API Base URL(包括/v1等前缀)" }
+    $Model = Read-Host "图片模型ID(按供应商控制台填写)"
+}
+if ($Provider -or $BaseUrl -or $ApiFormat) {
+    # A new connection must not inherit an old credential, custom auth header,
+    # query, or endpoint mapping from a different provider.
+    if (-not $ProviderConfigPath) { $providerSettings = @{} }
+    $connectionChanged = $true
+    if ($Provider) { $providerSettings.provider = $Provider }
+    elseif ($BaseUrl) { $providerSettings.provider = "openai-compatible" }
+    if ($BaseUrl) { $providerSettings.base_url = $BaseUrl }
+    if ($ApiFormat) { $providerSettings.api_format = $ApiFormat }
+}
+if ($Model) { $providerSettings.model = $Model }
 $apiKey = ""
 $authSource = ""
-if (-not $ResetApiKey) {
-    $apiKey = Read-ApiKeyFromConfig $configPath
+$noKeyRequired = $providerSettings.ContainsKey("auth_type") -and $providerSettings.auth_type -eq "none"
+if ($noKeyRequired) {
+    foreach ($keyField in @("api_key", "apiKey", "api_key_env")) { $providerSettings.Remove($keyField) }
+    $authSource = "none"
+}
+if (-not $noKeyRequired -and -not $ResetApiKey) {
+    if ($providerSettings.ContainsKey("api_key")) { $apiKey = [string]$providerSettings.api_key }
+    elseif ($providerSettings.ContainsKey("apiKey")) { $apiKey = [string]$providerSettings.apiKey }
     if ($apiKey) {
         $authSource = "existing_config"
     }
 }
 
-if (-not $apiKey -and -not $ResetApiKey -and $env:WAWAPI_API_KEY) {
-    $apiKey = [string]$env:WAWAPI_API_KEY
+if (-not $noKeyRequired -and -not $apiKey -and -not $ResetApiKey -and -not $providerSettings.ContainsKey("api_key_env")) {
+    if ($env:IMAGE_API_KEY) { $apiKey = [string]$env:IMAGE_API_KEY }
     $authSource = "environment"
 }
-if (-not $apiKey) {
-    $apiKey = Read-MaskedValue "请输入Wawapi API Key"
+$environmentReference = $providerSettings.ContainsKey("api_key_env") -and -not $ResetApiKey
+if ($environmentReference -and -not $apiKey) { $authSource = "environment_reference" }
+if (-not $apiKey -and -not $noKeyRequired -and -not $environmentReference) {
+    $apiKey = Read-MaskedValue "请输入当前供应商的API Key"
     $authSource = "prompt"
 }
 $apiKey = $apiKey.Trim()
-if ($apiKey.Length -lt 16 -or $apiKey -match "\s") {
+if ($apiKey -match "[\r\n]") {
     throw "API Key格式不正确"
+}
+if ($ResetApiKey) {
+    foreach ($keyField in @("api_key", "apiKey", "api_key_env")) { $providerSettings.Remove($keyField) }
 }
 
 $npmCache = Join-Path $InstallRoot ".npm-cache"
@@ -737,8 +809,8 @@ $mcpCommand = Write-ManagedMcpLauncher $InstallRoot $runtime.node
 if (-not (Test-Path -LiteralPath $mcpCommand -PathType Leaf)) {
     throw "安装后缺少MCP命令：$mcpCommand"
 }
-$packageRoot = Join-Path $InstallRoot "node_modules\wawapi-image-mcp"
-$skillSource = Join-Path $packageRoot "skills\wawapi-image"
+$packageRoot = Join-Path $InstallRoot "node_modules\universal-image-mcp"
+$skillSource = Join-Path $packageRoot "skills\universal-image"
 $doctorScript = Join-Path $packageRoot "scripts\mcp-doctor.mjs"
 foreach ($requiredPath in @($skillSource, $doctorScript)) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
@@ -748,8 +820,15 @@ foreach ($requiredPath in @($skillSource, $doctorScript)) {
 $installedPackage = Get-Content -LiteralPath (Join-Path $packageRoot "package.json") -Raw | ConvertFrom-Json
 $installMarker = Write-InstallMarker $InstallRoot ([string]$installedPackage.version) $runtime
 
-$protectedConfig = Write-ProtectedConfig $stateRoot $apiKey
-$env:WAWAPI_IMAGE_HOME = $stateRoot
+$protectedConfig = Write-ProtectedConfig $stateRoot $apiKey $providerSettings
+$env:IMAGE_MCP_HOME = $stateRoot
+$forwardedEnvNames = @()
+if ($providerSettings.ContainsKey("api_key_env")) { $forwardedEnvNames += [string]$providerSettings.api_key_env }
+if ($providerSettings.ContainsKey("header_env")) {
+    $headerReferences = $providerSettings.header_env
+    if ($headerReferences -is [System.Collections.IDictionary]) { $forwardedEnvNames += @($headerReferences.Values) }
+    else { $forwardedEnvNames += @($headerReferences.PSObject.Properties | ForEach-Object { [string]$_.Value }) }
+}
 
 $skillBackup = $null
 if (-not $SkipSkillInstall) {
@@ -766,7 +845,7 @@ if (-not $SkipSkillInstall) {
         if ($replaceKnownLink) {
             Remove-DirectoryLink $skillTarget
         } else {
-            $skillBackup = Join-Path $skillsRoot ("wawapi-image.backup-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+            $skillBackup = Join-Path $skillsRoot ("universal-image.backup-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
             Move-Item -LiteralPath $skillTarget -Destination $skillBackup
         }
     }
@@ -780,16 +859,16 @@ if (-not $SkipMcpRegistration) {
     $previousCodexHome = $env:CODEX_HOME
     try {
         $env:CODEX_HOME = $resolvedCodexHome
-        $mcpGet = Invoke-NativeCommand $codex.Source @("mcp", "get", "wawapi-image")
+        $mcpGet = Invoke-NativeCommand $codex.Source @("mcp", "get", "universal-image")
         if ($mcpGet.exit_code -eq 0) {
-            $mcpRemove = Invoke-NativeCommand $codex.Source @("mcp", "remove", "wawapi-image")
+            $mcpRemove = Invoke-NativeCommand $codex.Source @("mcp", "remove", "universal-image")
             if ($mcpRemove.exit_code -ne 0) {
                 throw "无法替换已有Codex MCP注册，退出码：$($mcpRemove.exit_code)"
             }
             $mcpReplaced = $true
         }
         $mcpAdd = Invoke-NativeCommand $codex.Source @(
-            "mcp", "add", "--env", "WAWAPI_IMAGE_HOME=$stateRoot", "wawapi-image", "--", $mcpCommand
+            "mcp", "add", "--env", "IMAGE_MCP_CONFIG=$configPath", "universal-image", "--", $mcpCommand
         )
         if ($mcpAdd.exit_code -ne 0) {
             throw "Codex MCP注册失败，退出码：$($mcpAdd.exit_code)"
@@ -797,7 +876,8 @@ if (-not $SkipMcpRegistration) {
         $mcpTimeout = Set-CodexMcpToolTimeout `
             (Join-Path $resolvedCodexHome "config.toml") `
             $codex.Source `
-            $script:CodexToolTimeoutSec
+            $script:CodexToolTimeoutSec `
+            $forwardedEnvNames
         $mcpRegistered = $true
     } finally {
         $env:CODEX_HOME = $previousCodexHome
@@ -837,6 +917,7 @@ $result = [pscustomobject]@{
     mcp_registered = $mcpRegistered
     mcp_replaced = $mcpReplaced
     mcp_tool_timeout_sec = if ($mcpTimeout) { [int]$mcpTimeout.seconds } else { $null }
+    mcp_env_vars = if ($mcpTimeout) { @($mcpTimeout.environment_variables) } else { @() }
     mcp_tool_timeout_verified = if ($mcpTimeout) { [bool]$mcpTimeout.verified } else { $false }
     skill_target = if ($SkipSkillInstall) { $null } else { $skillTarget }
     skill_backup = $skillBackup

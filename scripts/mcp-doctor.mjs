@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import packageJson from "../package.json" with { type: "json" };
+import path from "node:path";
 
 const REQUIRED_TOOLS = [
   "image_doctor",
@@ -12,20 +13,21 @@ const REQUIRED_TOOLS = [
 ];
 
 const command = process.argv[2];
-if (!command) throw new Error("Pass the wawapi-image-mcp command path as argv[2]");
-const stateRoot = process.argv[3] || process.env.WAWAPI_IMAGE_HOME;
-if (!stateRoot) throw new Error("Pass the MCP state directory as argv[3] or WAWAPI_IMAGE_HOME");
+if (!command) throw new Error("Pass the universal-image-mcp command path as argv[2]");
+const stateRoot = process.argv[3] || process.env.IMAGE_MCP_HOME;
+if (!stateRoot) throw new Error("Pass the MCP state directory as argv[3] or IMAGE_MCP_HOME");
 const offline = process.argv.includes("--offline");
 
 const transport = new StdioClientTransport({
   command,
   env: {
     ...process.env,
-    WAWAPI_IMAGE_HOME: stateRoot,
+    IMAGE_MCP_HOME: stateRoot,
+    IMAGE_MCP_CONFIG: path.join(stateRoot, "config.json"),
   },
   stderr: "pipe",
 });
-const client = new Client({ name: "wawapi-image-mcp-doctor", version: packageJson.version });
+const client = new Client({ name: "universal-image-mcp-doctor", version: packageJson.version });
 
 function parseTextEnvelope(response, toolName) {
   if (response.isError) throw new Error(`${toolName} failed: ${response.content[0]?.text || "unknown error"}`);

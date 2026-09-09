@@ -1,6 +1,6 @@
 # Contributing
 
-Contributions are welcome when they preserve the project's narrow scope: one stdio MCP server and one Codex Skill for Wawapi image generation from text-only model environments.
+Contributions are welcome when they preserve the project's narrow scope: one stdio MCP server and one Codex Skill for configurable image generation from text-only model environments.
 
 ## Development setup
 
@@ -19,12 +19,12 @@ npm pack --dry-run
 Build a local release bundle on Windows:
 
 ```powershell
-npm run build:release
+.\scripts\build-release.ps1
 ```
 
 The Windows smoke test uses a local Codex configuration shim by default so GitHub-hosted runners do not need Codex installed. Before a Release, also run it locally with `-UseInstalledCodex` to verify that the current Codex binary reads back `tool_timeout_sec=600`.
 
-Offline tests must not require an API Key or contact Wawapi. The live smoke test is optional, may incur charges, and must only be run with a Key and request authorized by its owner.
+Offline tests must not require an API Key or contact image providers. The live smoke test is optional, may incur charges, and must only be run with a Key and request authorized by its owner.
 
 ## Pull requests
 
@@ -41,7 +41,7 @@ Offline tests must not require an API Key or contact Wawapi. The live smoke test
 
 ## Capability evidence
 
-Changes to `resources/capabilities.json` or the Skill capability reference must be based on an observed request. Record the observation time, requested model/size/format, reference-image state, HTTP outcome, and actual file metadata. Do not turn a transient 502/503/524 response into a permanent unsupported-capability claim.
+Protocol documentation must distinguish offline contract checks from authorized online observations. There is no bundled vendor capability snapshot. Record the observation time, requested model/size/format, reference-image state, HTTP outcome, and actual file metadata. Do not turn a transient 502/503/524 response into a permanent unsupported-capability claim.
 
 Live evidence may cost money. Do not run new billable requests merely to satisfy a pull request unless the Key owner has explicitly authorized them.
 

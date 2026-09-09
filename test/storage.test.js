@@ -62,7 +62,7 @@ function makeWebp(width = 1, height = 1) {
 }
 
 async function temporaryRoot(t) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "wawapi-storage-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "image-storage-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   return root;
 }

@@ -24,6 +24,6 @@ Include the project version, Node.js version, Windows version, affected MCP tool
 
 If a Key is accidentally posted, revoke or rotate it immediately. Deleting a comment or rewriting Git history is not sufficient because copies may already exist.
 
-The installer stores the Key outside the repository and restricts the state directory ACL to the current Windows user and `SYSTEM`. The MCP never reads `OPENAI_API_KEY` and does not accept a configurable Base URL.
+The installer stores the Key outside the repository and restricts the state directory ACL to the current Windows user and `SYSTEM`. The MCP requires an explicit connection. Official environment keys are inferred only for the explicitly selected official origin; custom gateways use an explicit key reference. API redirects are rejected.
 
-The Windows installer downloads its managed Node.js runtime only from the pinned official `nodejs.org` HTTPS path and verifies an embedded SHA-256 before extraction. Runtime npm dependencies are version-locked and bundled into the signed Release archive; end-user installation runs npm in offline mode and does not resolve packages from the registry.
+The Windows installer downloads its managed Node.js runtime only from the pinned official `nodejs.org` HTTPS path and verifies an embedded SHA-256 before extraction. Runtime npm dependencies are version-locked and bundled into the checksummed Release archive; end-user installation runs npm in offline mode and does not resolve packages from the registry.

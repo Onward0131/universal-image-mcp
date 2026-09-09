@@ -1,0 +1,7 @@
+{
+  "provider": "openai-compatible",
+  "base_url": "https://your-provider.example/v1",
+  "model": "your-image-model",
+  "api_key_env": "MY_IMAGE_KEY",
+  "probe_models": false
+}
