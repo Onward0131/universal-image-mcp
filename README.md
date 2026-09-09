@@ -6,6 +6,14 @@
 
 项目、npm包与命令名：`universal-image-mcp`；MCP与Skill名：`universal-image`。没有默认第三方地址或默认图片模型，必须明确配置连接。
 
+## 新手上手示例
+
+先按[Windows安装](#windows安装)完成配置，或把本项目地址发给Codex，让它协助完成安装步骤。配置完成后重启Codex，新建任务，描述你想生成的图片即可。下图展示了配置、自检和在对话中显示生成图片的流程：
+
+![Codex配置通用图片MCP、完成自检并生成图片的操作示例](docs/images/codex-quickstart.png)
+
+截图中的Base URL与Key已遮挡。实际配置时，通过安装器的掩码提示输入Key；模型和图片尺寸以所选供应商的实际结果为准。
+
 ## 支持哪些API
 
 |协议|典型服务|文生图|参考图编辑|

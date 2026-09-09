@@ -38,7 +38,8 @@
     "docs/PROVIDERS.md",
     "docs/ASSESSMENT.md",
     "examples/",
-    "docs/LIVE-TEST.md"
+    "docs/LIVE-TEST.md",
+    "docs/images/codex-quickstart.png"
   ],
   "bin": {
     "universal-image-mcp": "bin/universal-image-mcp.mjs"

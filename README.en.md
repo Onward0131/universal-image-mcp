@@ -6,6 +6,14 @@ Generate, edit, save, and display images in Codex through a provider you configu
 
 Package and executable: `universal-image-mcp`. MCP registration and Skill: `universal-image`. No third-party endpoint or image model is selected by default.
 
+## Beginner walkthrough
+
+Follow [Windows installation](#windows-installation), or share this repository with Codex and ask it to help with the installation steps. Once configured, restart Codex, start a new task, and describe the image you want. This Chinese-language screenshot shows setup, the MCP check, and a generated image displayed in the conversation:
+
+![Codex image MCP setup, configuration check, and image generation example](docs/images/codex-quickstart.png)
+
+The Base URL and key are obscured in the screenshot. Enter your key through the installer's masked prompt. The model and resulting image dimensions depend on your configured provider.
+
 ## Supported protocols
 
 |Protocol|Typical service|Generation|Reference editing|
