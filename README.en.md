@@ -8,6 +8,8 @@ Package and executable: `universal-image-mcp`. MCP registration and Skill: `univ
 
 ## Beginner walkthrough
 
+> **Check that your key belongs to an image-generation group.** Many third-party API providers require a separate key created under a dedicated group, often called `image`, “生图”, or “额外生图”. A key for chat, coding, or other model groups may not support image generation. Check the provider's dashboard to confirm that the group allows your chosen image model, then use its key. Group names and permission rules depend on the provider.
+
 Follow [Windows installation](#windows-installation), or share this repository with Codex and ask it to help with the installation steps. Once configured, restart Codex, start a new task, and describe the image you want. This Chinese-language screenshot shows setup, the MCP check, and a generated image displayed in the conversation:
 
 ![Codex image MCP setup, configuration check, and image generation example](docs/images/codex-quickstart.png)
@@ -34,7 +36,7 @@ Configure Base URL, model, authentication, headers, endpoints, query parameters,
 Use Windows 10/11 with a working `codex` command. No preinstalled Node.js, npm, PowerShell 7, or administrator access is required. The installer prefers PowerShell 7 and supports the Windows PowerShell 5.1 fallback.
 
 1. Download `Universal-Image-MCP-v2.0.0.zip` from [Releases](https://github.com/Onward0131/universal-image-mcp/releases/latest) and extract it.
-2. Double-click `install.cmd`, select a provider, and enter its complete API prefix, model ID, and key.
+2. Double-click `install.cmd`, select a provider, and enter its complete API prefix, model ID, and a key with image-generation access. If the provider requires a dedicated group, use a key from its `image` or image-generation group.
 3. Wait for installation to finish, fully restart Codex, and start a new task.
 
 A Base URL includes any required version prefix, such as `https://your-provider.example/v1`; the server never adds `/v1` automatically. Official provider presets supply their own endpoints. Configure an image model available to your account.
@@ -98,5 +100,7 @@ npm audit --omit=dev --audit-level=moderate
 Offline tests do not call image providers. `scripts/live-mcp-smoke.mjs` is billable and requires the key owner's authorization. Never commit credentials, raw provider responses, or private images.
 
 `MCP error -32001: Request timed out` is a host timeout; verify the 600-second setting and restart Codex. Do not replay an uncertain request. Inspect `data.result.deviations` for output mismatches. Private image-download URLs remain blocked; local gateways may return Base64 instead.
+
+If a key works for chat but not images, check its group and the image models that group permits. If required, create a key under the provider's dedicated image-generation group and update the configuration with `-ResetApiKey`. Changing the model name alone does not grant additional key permissions.
 
 An independent community integration under the [MIT License](LICENSE), not an official project of Codex or an API provider.

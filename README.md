@@ -8,6 +8,8 @@
 
 ## 新手上手示例
 
+> **先确认Key属于生图分组。** 很多第三方API平台需要在专门的生图分组下单独创建Key，分组常见名称为`image`、“生图”或“额外生图”。普通聊天、代码或其他模型分组的Key未必能直接生图。请先在供应商控制台确认该分组允许调用目标图片模型，再使用对应的Key；具体分组名称和权限规则以平台说明为准。
+
 先按[Windows安装](#windows安装)完成配置，或把本项目地址发给Codex，让它协助完成安装步骤。配置完成后重启Codex，新建任务，描述你想生成的图片即可。下图展示了配置、自检和在对话中显示生成图片的流程：
 
 ![Codex配置通用图片MCP、完成自检并生成图片的操作示例](docs/images/codex-quickstart.png)
@@ -34,7 +36,7 @@
 需要Windows10/11、可运行`codex`的Codex安装，以及图片服务账号或可信本地网关。不需要预装Node.js、npm或PowerShell 7，也不需要管理员权限。安装入口优先使用PowerShell7，未安装时兼容Windows内置PowerShell5.1。
 
 1. 从[Releases](https://github.com/Onward0131/universal-image-mcp/releases/latest)下载`Universal-Image-MCP-v2.0.0.zip`并解压。
-2. 双击解压目录中的`install.cmd`，选择供应商并填写完整Base URL、图片模型ID和API Key。
+2. 双击解压目录中的`install.cmd`，选择供应商并填写完整Base URL、图片模型ID和具有生图权限的Key；平台要求专用分组时，填写`image`或“生图”分组的Key。
 3. 等待安装完成，再完全关闭并重新打开Codex，新建任务。
 
 Base URL包含供应商要求的版本前缀，例如`https://your-provider.example/v1`。不会自动添加`/v1`。OpenAI、Gemini和OpenRouter预设提供对应服务地址，仍需指定实际可用的图片模型。
@@ -99,6 +101,7 @@ Node.js22或更高版本运行`npm ci`后，参考[Codex手动配置](docs/PROVI
 
 - `base_url_required`：配置完整Base URL，或选择一个明确的供应商预设。
 - `model_required`：填写供应商控制台或模型目录返回的实际图片模型ID。
+- Key能聊天但不能生图：检查Key是否属于`image`、“生图”或“额外生图”分组，以及该分组是否开放目标图片模型。需要时在正确分组下新建Key，再用`-ResetApiKey`更新配置；仅修改模型名称不会增加Key权限。
 - `invalid_api_key`：确认Key与当前站点匹配，并具有图片服务权限。
 - `missing_header_env`：确保启动Codex的环境能访问所引用变量，仅在其他终端中设置不会传给已有桌面进程。
 - `MCP error -32001: Request timed out`：这是宿主超时，检查600秒配置并重启Codex。上一请求计费状态未知，不要自动重试。
