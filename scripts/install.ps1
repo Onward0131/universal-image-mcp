@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$PackagePath,
     [string]$ChecksumPath,
@@ -92,7 +92,7 @@ function Test-OwnedInstallRoot([string]$Path) {
     $markerPath = Get-InstallMarkerPath $resolved
     if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
         try {
-            $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json
+            $marker = Get-Content -LiteralPath $markerPath -Raw -Encoding UTF8 | ConvertFrom-Json
             if (
                 [string]$marker.product -eq "universal-image-mcp" -and
                 (Resolve-AbsolutePath ([string]$marker.install_root)) -ieq $resolved
@@ -112,7 +112,7 @@ function Test-OwnedInstallRoot([string]$Path) {
         (Test-Path -LiteralPath $commandPath -PathType Leaf)
     ) {
         try {
-            $packageInfo = Get-Content -LiteralPath $packageJsonPath -Raw | ConvertFrom-Json
+            $packageInfo = Get-Content -LiteralPath $packageJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
             return [string]$packageInfo.name -eq "universal-image-mcp"
         } catch {
             return $false
@@ -402,7 +402,7 @@ function Read-ApiKeyFromConfig([string]$ConfigPath) {
         return ""
     }
     try {
-        $parsed = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
+        $parsed = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
         return [string]$parsed.api_key
     } catch {
         return ""
@@ -725,11 +725,11 @@ $configPath = Join-Path $stateRoot "config.json"
 $providerSettings = @{}
 $connectionChanged = $false
 if (Test-Path -LiteralPath $configPath -PathType Leaf) {
-    $savedSettings = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+    $savedSettings = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
     foreach ($property in $savedSettings.PSObject.Properties) { $providerSettings[$property.Name] = $property.Value }
 }
 if ($ProviderConfigPath) {
-    $suppliedSettings = Get-Content -LiteralPath $ProviderConfigPath -Raw | ConvertFrom-Json
+    $suppliedSettings = Get-Content -LiteralPath $ProviderConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $providerSettings = @{}
     foreach ($property in $suppliedSettings.PSObject.Properties) { $providerSettings[$property.Name] = $property.Value }
     $connectionChanged = $true
@@ -817,7 +817,7 @@ foreach ($requiredPath in @($skillSource, $doctorScript)) {
         throw "安装包缺少必要文件：$requiredPath"
     }
 }
-$installedPackage = Get-Content -LiteralPath (Join-Path $packageRoot "package.json") -Raw | ConvertFrom-Json
+$installedPackage = Get-Content -LiteralPath (Join-Path $packageRoot "package.json") -Raw -Encoding UTF8 | ConvertFrom-Json
 $installMarker = Write-InstallMarker $InstallRoot ([string]$installedPackage.version) $runtime
 
 $protectedConfig = Write-ProtectedConfig $stateRoot $apiKey $providerSettings

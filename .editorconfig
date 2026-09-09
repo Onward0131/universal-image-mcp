@@ -14,5 +14,9 @@ indent_size = 2
 indent_style = space
 indent_size = 4
 
+[scripts/install.ps1]
+# Windows PowerShell 5.1 otherwise decodes Chinese text with the ANSI code page.
+charset = utf-8-bom
+
 [*.md]
 trim_trailing_whitespace = false
