@@ -42,7 +42,7 @@ jobs:
 
       - name: Build release assets
         shell: pwsh
-        run: npm run build:release
+        run: .\scripts\build-release.ps1
 
       - name: Create GitHub Release
         shell: pwsh

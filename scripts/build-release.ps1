@@ -12,7 +12,7 @@ $version = [string]$packageInfo.version
 if ($version -notmatch "^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$") {
     throw "package.json中的版本号无效：$version"
 }
-$releaseBaseName = "Wawapi-Image-MCP-v$version"
+$releaseBaseName = "Universal-Image-MCP-v$version"
 $releaseParent = Join-Path $projectRoot "release"
 if (-not $ReleaseRoot) {
     $ReleaseRoot = Join-Path $releaseParent $releaseBaseName
@@ -25,7 +25,7 @@ if (-not $ReleaseRoot.StartsWith($releasePrefix, [System.StringComparison]::Ordi
 
 $npm = Get-Command npm.cmd -ErrorAction Stop
 New-Item -ItemType Directory -Path $releaseParent -Force | Out-Null
-$staging = Join-Path $releaseParent (".wawapi-image-mcp-staging-" + [guid]::NewGuid().ToString("N"))
+$staging = Join-Path $releaseParent (".universal-image-mcp-staging-" + [guid]::NewGuid().ToString("N"))
 $zipPath = Join-Path $releaseParent "$releaseBaseName.zip"
 $zipHashPath = "$zipPath.sha256"
 $zipTemp = Join-Path $releaseParent (".$releaseBaseName.$PID.tmp.zip")
@@ -80,9 +80,9 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "npm pack失败，退出码：$LASTEXITCODE"
     }
-    $package = Get-ChildItem -LiteralPath $staging -Filter "wawapi-image-mcp-*.tgz" -File | Select-Object -First 1
+    $package = Get-ChildItem -LiteralPath $staging -Filter "universal-image-mcp-*.tgz" -File | Select-Object -First 1
     if (-not $package) {
-        throw "npm pack没有生成wawapi-image-mcp-*.tgz"
+        throw "npm pack没有生成universal-image-mcp-*.tgz"
     }
 
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "install.ps1") -Destination (Join-Path $staging "install.ps1")
@@ -95,6 +95,8 @@ try {
     Copy-Item -LiteralPath (Join-Path $projectRoot "CONTRIBUTING.md") -Destination (Join-Path $staging "CONTRIBUTING.md")
     Copy-Item -LiteralPath (Join-Path $projectRoot "LICENSE") -Destination (Join-Path $staging "LICENSE")
     Copy-Item -LiteralPath (Join-Path $projectRoot "SECURITY.md") -Destination (Join-Path $staging "SECURITY.md")
+    Copy-Item -LiteralPath (Join-Path $projectRoot "docs") -Destination (Join-Path $staging "docs") -Recurse
+    Copy-Item -LiteralPath (Join-Path $projectRoot "examples") -Destination (Join-Path $staging "examples") -Recurse
 
     $releaseTextFiles = @(
         (Join-Path $staging "install.ps1"),
@@ -117,9 +119,10 @@ try {
         }
     }
 
-    $hashLines = Get-ChildItem -LiteralPath $staging -File | Sort-Object Name | ForEach-Object {
+    $hashLines = Get-ChildItem -LiteralPath $staging -File -Recurse | Sort-Object FullName | ForEach-Object {
         $hash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256
-        "$($hash.Hash.ToLowerInvariant())  $($_.Name)"
+        $relativeName = [System.IO.Path]::GetRelativePath($staging, $_.FullName).Replace('\', '/')
+        "$($hash.Hash.ToLowerInvariant())  $relativeName"
     }
     [System.IO.File]::WriteAllLines(
         (Join-Path $staging "SHA256SUMS.txt"),
@@ -154,7 +157,7 @@ try {
         zip = $zipPath
         zip_sha256 = $zipHash.Hash.ToLowerInvariant()
         zip_sha256_file = $zipHashPath
-        package = (Get-ChildItem -LiteralPath $ReleaseRoot -Filter "wawapi-image-mcp-*.tgz" -File | Select-Object -First 1).FullName
+        package = (Get-ChildItem -LiteralPath $ReleaseRoot -Filter "universal-image-mcp-*.tgz" -File | Select-Object -First 1).FullName
         package_file_count = $packedPaths.Count
         project_files = @($packedPaths | Where-Object { $_ -notmatch "^node_modules/" })
         bundled_dependency_count = $bundledDependencies.Count

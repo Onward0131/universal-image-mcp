@@ -1,0 +1,6 @@
+{
+  "provider": "openrouter",
+  "model": "vendor/image-model",
+  "api_key_env": "OPENROUTER_API_KEY",
+  "extra_body": { "modalities": ["image", "text"] }
+}

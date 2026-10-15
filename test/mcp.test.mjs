@@ -3,12 +3,21 @@ import assert from "node:assert/strict";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import packageJson from "../package.json" with { type: "json" };
-import { createWawapiImageMcpServer } from "../bin/wawapi-image-mcp.mjs";
+import { createUniversalImageMcpServer } from "../bin/universal-image-mcp.mjs";
 
 test("MCP lists text-only image tools and calls offline capability explanation", async (t) => {
-  const server = createWawapiImageMcpServer();
-const client = new Client({ name: "wawapi-image-mcp-test-client", version: packageJson.version });
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "mcp-contract-"));
+  const configPath = path.join(root, "config.json");
+  await fs.writeFile(configPath, JSON.stringify({ provider: "openai-compatible", base_url: "https://provider.example/v1", model: "image-test" }));
+  const original = process.env.IMAGE_MCP_CONFIG;
+  process.env.IMAGE_MCP_CONFIG = configPath;
+  t.after(async () => { if (original === undefined) delete process.env.IMAGE_MCP_CONFIG; else process.env.IMAGE_MCP_CONFIG = original; await fs.rm(root, { recursive: true, force: true }); });
+  const server = createUniversalImageMcpServer();
+const client = new Client({ name: "universal-image-mcp-test-client", version: packageJson.version });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   t.after(async () => {
     await client.close();
@@ -57,9 +66,9 @@ const client = new Client({ name: "wawapi-image-mcp-test-client", version: packa
   assert.equal(called.content.some((item) => item.type === "image"), false);
   const envelope = JSON.parse(called.content[0].text);
   assert.equal(envelope.ok, true);
-  assert.equal(envelope.data.selection_scope, "bundled_baseline");
-  assert.equal(envelope.data.explanation.selectedModel, "gpt-image-2-high");
+  assert.equal(envelope.data.selection_scope, "configured_provider");
+  assert.equal(envelope.data.explanation.selectedModel, "image-test");
   assert.equal(envelope.data.explanation.requestedCount, 2);
-  assert.equal(envelope.data.explanation.expectedCountStatus, "exact");
-  assert.equal(envelope.data.explanation.evidence[0].actualCount, 2);
+  assert.equal(envelope.data.explanation.expectedCountStatus, "unknown");
+  assert.deepEqual(envelope.data.explanation.evidence, []);
 });

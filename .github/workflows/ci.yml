@@ -65,7 +65,7 @@ jobs:
       - name: Build Windows release bundle
         if: matrix.os == 'windows-latest' && matrix.node == 24
         shell: pwsh
-        run: npm run build:release
+        run: .\scripts\build-release.ps1
 
       - name: Download pinned managed Node.js archive
         if: matrix.os == 'windows-latest' && matrix.node == 24
@@ -79,7 +79,7 @@ jobs:
           if ($hash -ne "57f71ab3652e797d84acddc79c81cc9ff1c6ddb2a1974cdb83f00fee9bff4c73") {
             throw "Managed Node.js archive checksum mismatch"
           }
-          "WAWAPI_NODE_ARCHIVE=$archive" >> $env:GITHUB_ENV
+          "IMAGE_NODE_ARCHIVE=$archive" >> $env:GITHUB_ENV
 
       # GitHub-hosted runners do not guarantee a Codex installation. The smoke
       # script therefore uses its local config-compatible Codex test shim by
@@ -88,8 +88,8 @@ jobs:
         if: matrix.os == 'windows-latest' && matrix.node == 24
         shell: pwsh
         run: |
-          $releaseRoot = (Get-ChildItem -LiteralPath release -Directory -Filter "Wawapi-Image-MCP-v*" | Select-Object -First 1).FullName
-          .\scripts\test-windows-install.ps1 -ReleaseRoot $releaseRoot -NodeRuntimeArchive $env:WAWAPI_NODE_ARCHIVE
+          $releaseRoot = (Get-ChildItem -LiteralPath release -Directory -Filter "Universal-Image-MCP-v*" | Select-Object -First 1).FullName
+          .\scripts\test-windows-install.ps1 -ReleaseRoot $releaseRoot -NodeRuntimeArchive $env:IMAGE_NODE_ARCHIVE
 
       # This executes the complete installer under Windows PowerShell 5.1,
       # matching install.cmd's fallback when pwsh is not installed.
@@ -97,5 +97,5 @@ jobs:
         if: matrix.os == 'windows-latest' && matrix.node == 24
         shell: powershell
         run: |
-          $releaseRoot = (Get-ChildItem -LiteralPath release -Directory -Filter "Wawapi-Image-MCP-v*" | Select-Object -First 1).FullName
-          .\scripts\test-windows-install.ps1 -ReleaseRoot $releaseRoot -NodeRuntimeArchive $env:WAWAPI_NODE_ARCHIVE
+          $releaseRoot = (Get-ChildItem -LiteralPath release -Directory -Filter "Universal-Image-MCP-v*" | Select-Object -First 1).FullName
+          .\scripts\test-windows-install.ps1 -ReleaseRoot $releaseRoot -NodeRuntimeArchive $env:IMAGE_NODE_ARCHIVE

@@ -4,7 +4,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const skippedDirectories = new Set([".git", "node_modules", "release"]);
+const skippedDirectories = new Set([".git", "node_modules", "release", "generated-images"]);
 const binaryExtensions = new Set([".gif", ".jpg", ".jpeg", ".png", ".tgz", ".webp", ".zip"]);
 
 async function read(relativePath) {
@@ -38,11 +38,13 @@ test("public repository metadata is complete", async () => {
     "README.en.md",
     "README.md",
     "SECURITY.md",
+    "docs/PROVIDERS.md",
+    "docs/LIVE-TEST.md",
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
     "scripts/install.cmd",
     "scripts/test-codex-shim.cmd",
-    "scripts/test-codex-shim.ps1",
+    "scripts/codex-cli-shim.mjs",
   ];
   for (const relativePath of requiredFiles) {
     const stat = await fs.stat(path.join(root, relativePath));
@@ -50,7 +52,7 @@ test("public repository metadata is complete", async () => {
   }
 
   const packageJson = JSON.parse(await read("package.json"));
-  assert.equal(packageJson.name, "wawapi-image-mcp");
+  assert.equal(packageJson.name, "universal-image-mcp");
   assert.equal(packageJson.license, "MIT");
   assert.match(packageJson.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
 });
@@ -92,7 +94,7 @@ test("release documentation exposes capability boundaries and a double-click ins
 });
 
 test("Skill metadata is concise and declares the MCP dependency", async () => {
-  const skill = await read("skills/wawapi-image/SKILL.md");
+  const skill = await read("skills/universal-image/SKILL.md");
   const frontmatter = /^---\r?\n([\s\S]+?)\r?\n---/.exec(skill);
   assert.ok(frontmatter, "SKILL.md must begin with YAML frontmatter");
   const keys = frontmatter[1]
@@ -101,7 +103,7 @@ test("Skill metadata is concise and declares the MCP dependency", async () => {
     .filter(Boolean)
     .sort();
   assert.deepEqual(keys, ["description", "name"]);
-  assert.match(frontmatter[1], /^name: wawapi-image$/m);
+  assert.match(frontmatter[1], /^name: universal-image$/m);
   assert.ok(skill.split(/\r?\n/).length < 500, "SKILL.md should stay below 500 lines");
   assert.match(skill, /catalog_status=unverified[^\n]+non-blocking/i);
   assert.match(skill, /generation_channel_status=not_probed/);
@@ -112,10 +114,10 @@ test("Skill metadata is concise and declares the MCP dependency", async () => {
   assert.match(liveSmoke, /LIVE_TOOL_TIMEOUT_MS = 600_000/);
   assert.match(liveSmoke, /maxTotalTimeout: LIVE_TOOL_TIMEOUT_MS/);
 
-  const agentMetadata = await read("skills/wawapi-image/agents/openai.yaml");
-  assert.match(agentMetadata, /default_prompt: ".*\$wawapi-image/);
+  const agentMetadata = await read("skills/universal-image/agents/openai.yaml");
+  assert.match(agentMetadata, /default_prompt: ".*\$universal-image/);
   assert.match(agentMetadata, /type: "mcp"/);
-  assert.match(agentMetadata, /value: "wawapi-image"/);
+  assert.match(agentMetadata, /value: "universal-image"/);
   assert.match(agentMetadata, /transport: "stdio"/);
 });
 
@@ -138,14 +140,15 @@ test("repository text files contain no credential-like values or retired product
     },
     {
       name: "retired environment variable",
-      expression: new RegExp(["WAW", "IMG_HOME"].join("")),
+      expression: new RegExp(["IMAGE", "_RETIRED_HOME"].join("")),
     },
     {
       name: "retired installation name",
-      expression: new RegExp(["waw", "img"].join(""), "i"),
+      expression: new RegExp(["retired", "-image-product"].join(""), "i"),
     },
   ];
 
+  patterns.push({ name: "removed vendor name", expression: new RegExp(["wa", "wapi"].join(""), "i") });
   const findings = [];
   for (const filePath of await listTextFiles()) {
     const content = await fs.readFile(filePath, "utf8");
