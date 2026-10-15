@@ -9,10 +9,35 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=moderate
+
   test:
     name: Node ${{ matrix.node }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -31,7 +56,7 @@ jobs:
 
       - name: Install locked dependencies
         shell: pwsh
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       - name: Run offline tests
         shell: pwsh
@@ -57,10 +82,6 @@ jobs:
       - name: Inspect npm package contents
         shell: pwsh
         run: npm pack --dry-run
-
-      - name: Audit production dependencies
-        shell: pwsh
-        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Build Windows release bundle
         if: matrix.os == 'windows-latest' && matrix.node == 24

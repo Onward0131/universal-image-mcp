@@ -8,9 +8,14 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: windows-latest
+    timeout-minutes: 20
 
     steps:
       - name: Check out tagged source
@@ -26,7 +31,11 @@ jobs:
 
       - name: Install locked dependencies
         shell: pwsh
-        run: npm ci
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit production dependencies
+        shell: pwsh
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Verify tag matches package version
         shell: pwsh

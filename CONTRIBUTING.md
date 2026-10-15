@@ -13,6 +13,7 @@ Requirements:
 ```powershell
 npm ci
 npm test
+npm audit --omit=dev --audit-level=moderate
 npm pack --dry-run
 ```
 
