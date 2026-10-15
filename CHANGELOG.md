@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Maintenance
+
+- Update the MCP SDK, Zod, and locked production dependencies; resolve the dependency audit findings.
+- Update the GitHub Actions checkout and Node.js setup actions and pin them to verified commits.
+- Run the CI dependency audit once per workflow and require it before building release assets.
+- Cancel superseded CI runs, bound job durations, and group routine Dependabot updates.
+
 ## [2.0.0] - 2026-09-09
 
 ### Breaking changes
