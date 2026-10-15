@@ -1,0 +1,10 @@
+{
+  "provider": "gemini",
+  "model": "your-gemini-image-model",
+  "api_key_env": "GEMINI_API_KEY",
+  "extra_body": {
+    "generationConfig": {
+      "imageConfig": { "aspectRatio": "16:9", "imageSize": "2K" }
+    }
+  }
+}

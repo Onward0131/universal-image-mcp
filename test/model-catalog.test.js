@@ -1,56 +1,24 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { createModelCatalog } = require("../lib/model-catalog");
-
-test("createModelCatalog exposes four image models as a multi-model channel", () => {
-  const catalog = createModelCatalog([
-    "gpt-image-2",
-    "gpt-image-2-high",
-    "gpt-image-2-low",
-    "gpt-image-2-medium",
-    "gpt-5.1",
-  ]);
-
-  assert.deepEqual(catalog.models, [
-    "gpt-image-2",
-    "gpt-image-2-high",
-    "gpt-image-2-low",
-    "gpt-image-2-medium",
-  ]);
-  assert.equal(catalog.mode, "multi");
-  assert.equal(catalog.modelCount, 4);
-  assert.equal(catalog.activeModel, "gpt-image-2");
-  assert.equal(catalog.catalogSource, "upstream");
+test("catalog preserves all IDs without inventing an active model", () => {
+  const c = createModelCatalog(["image-a", "image-b", "text-only"]);
+  assert.equal(c.modelCount, 3);
+  assert.equal(c.activeModel, null);
 });
-
-test("createModelCatalog selects the only upstream model when the configured default is absent", () => {
-  const catalog = createModelCatalog(["gpt-image-2-low"], "gpt-image-2");
-
-  assert.deepEqual(catalog.models, ["gpt-image-2-low"]);
-  assert.equal(catalog.mode, "single");
-  assert.equal(catalog.modelCount, 1);
-  assert.equal(catalog.defaultModel, "gpt-image-2");
-  assert.equal(catalog.activeModel, "gpt-image-2-low");
+test("configured deployment stays active even when absent from directory", () => {
+  const c = createModelCatalog(["image-a"], "deployment-b");
+  assert.equal(c.activeModel, "deployment-b");
+  assert.deepEqual(c.models, ["image-a"]);
 });
-
-test("createModelCatalog falls back to the configured model when discovery is empty", () => {
-  const catalog = createModelCatalog([], "gpt-image-custom");
-
-  assert.deepEqual(catalog.models, ["gpt-image-custom"]);
-  assert.equal(catalog.mode, "single");
-  assert.equal(catalog.activeModel, "gpt-image-custom");
-  assert.equal(catalog.catalogSource, "fallback");
+test("empty discovery does not pretend the configured model was returned", () => {
+  const c = createModelCatalog([], "deployment-b");
+  assert.deepEqual(c.models, []);
+  assert.equal(c.activeModel, "deployment-b");
+  assert.equal(c.catalogSource, "empty");
 });
-
-test("createModelCatalog removes empty and duplicate model identifiers", () => {
-  const catalog = createModelCatalog([
-    "gpt-image-2",
-    "",
-    " gpt-image-2 ",
-    null,
-    "dall-e-3",
-  ]);
-
-  assert.deepEqual(catalog.models, ["gpt-image-2", "dall-e-3"]);
-  assert.equal(catalog.modelCount, 2);
+test("normalizes duplicates and selects only an unambiguous image candidate", () => {
+  const c = createModelCatalog(["image-a", " image-a ", null, "text-only"]);
+  assert.equal(c.modelCount, 2);
+  assert.equal(c.activeModel, "image-a");
 });

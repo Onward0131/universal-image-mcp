@@ -10,21 +10,7 @@ const {
 
 const models = ["gpt-image-2", "gpt-image-2-high", "gpt-image-2-low", "gpt-image-2-medium"];
 
-test("auto selection uses an exact variant for high resolution", () => {
-  const selected = selectModel({ models, size: "3840x2160" });
-  assert.equal(selected.model, "gpt-image-2-high");
-  assert.equal(selected.reason, "high_resolution_prefers_exact_variant");
 
-  const explanation = explainCapability({ models, size: "3840x2160" });
-  assert.equal(explanation.selectedModel, "gpt-image-2-high");
-  assert.equal(explanation.expectedStatus, "exact");
-});
-
-test("auto text generation uses the reliable exact variant before the base model", () => {
-  const selected = selectModel({ models, size: "1024x1024" });
-  assert.equal(selected.model, "gpt-image-2-high");
-  assert.equal(selected.reason, "text_generation_prefers_reliable_variant");
-});
 
 test("format evidence does not borrow a PNG result for a WebP request", () => {
   const baseline = {
@@ -71,83 +57,9 @@ test("format evidence does not borrow a PNG result for a WebP request", () => {
   assert.equal(jpeg.evidence.length, 0);
 });
 
-test("count-aware evidence distinguishes one image from two independent images", () => {
-  const multi = explainCapability({
-    models,
-    model: "gpt-image-2-high",
-    size: "1024x1024",
-    format: "jpeg",
-    count: 2,
-  });
-  assert.equal(multi.requestedCount, 2);
-  assert.equal(multi.expectedStatus, "exact");
-  assert.equal(multi.expectedCountStatus, "exact");
-  assert.equal(multi.evidence[0].requestedCount, 2);
-  assert.equal(multi.evidence[0].actualCount, 2);
-  assert.ok(multi.cautions.includes("multiple_images_are_time_point_evidence_not_a_guarantee"));
 
-  const single = explainCapability({
-    models,
-    model: "gpt-image-2-high",
-    size: "1024x1024",
-    format: "jpeg",
-    count: 1,
-  });
-  assert.equal(single.expectedStatus, "unknown");
-  assert.equal(single.expectedCountStatus, "unknown");
-  assert.equal(single.evidence.length, 0);
-});
 
-test("latest base-model standard generation supersedes earlier transient failures", () => {
-  const explanation = explainCapability({
-    models: ["gpt-image-2"],
-    model: "gpt-image-2",
-    size: "1024x1024",
-    format: "png",
-    count: 1,
-  });
-  assert.equal(explanation.expectedStatus, "exact");
-  assert.equal(explanation.expectedSizeStatus, "exact");
-  assert.equal(explanation.expectedFormatStatus, "exact");
-  assert.equal(explanation.expectedCountStatus, "exact");
-  assert.equal(explanation.evidence[0].observedAt, "2026-08-04T17:43:30+08:00");
-  assert.equal(explanation.evidence[0].status, "exact");
-  assert.ok(explanation.evidence.slice(1).some((item) => item.status === "transient_failure"));
-});
 
-test("latest base-model multi-image evidence keeps count and size exact while format falls back", () => {
-  const explanation = explainCapability({
-    models: ["gpt-image-2"],
-    model: "gpt-image-2",
-    size: "1024x1024",
-    format: "jpeg",
-    count: 2,
-  });
-  assert.equal(explanation.expectedStatus, "degraded");
-  assert.equal(explanation.expectedSizeStatus, "exact");
-  assert.equal(explanation.expectedFormatStatus, "degraded");
-  assert.equal(explanation.expectedCountStatus, "exact");
-  assert.equal(explanation.evidence[0].observedAt, "2026-08-04T17:46:56+08:00");
-  assert.equal(explanation.evidence[0].actualCount, 2);
-  assert.equal(explanation.evidence[0].actual.length, 2);
-  assert.equal(explanation.evidence[1].actualCount, 1);
-  assert.ok(explanation.cautions.includes("multiple_images_are_time_point_evidence_not_a_guarantee"));
-});
-
-test("latest HTTP 524 remains transient while older exact evidence stays visible", () => {
-  const explanation = explainCapability({
-    models,
-    model: "gpt-image-2-high",
-    size: "1024x1024",
-    format: "png",
-    count: 1,
-  });
-  assert.equal(explanation.expectedStatus, "transient_failure");
-  assert.equal(explanation.evidence[0].httpStatus, 524);
-  assert.equal(explanation.evidence[0].status, "transient_failure");
-  assert.ok(explanation.evidence.slice(1).some((item) => item.status === "exact"));
-  assert.ok(explanation.cautions.includes("transient_http_failure_is_not_unsupported"));
-});
 
 test("capability status degrades when returned file count differs", () => {
   const baseline = {
@@ -178,7 +90,7 @@ test("capability status degrades when returned file count differs", () => {
   assert.equal(explanation.evidence[0].actualCount, 1);
 });
 
-test("auto selection prefers the base model for reference images", () => {
+test("reference observations remain scoped to an explicitly selected model", () => {
   const baseline = {
     generatedAt: "2026-08-02T00:00:00Z",
     events: [
@@ -207,6 +119,7 @@ test("auto selection prefers the base model for reference images", () => {
     models,
     size: "1024x1024",
     hasReferenceImage: true,
+    model: "gpt-image-2",
     baseline,
   });
   assert.equal(explanation.selectedModel, "gpt-image-2");
@@ -259,13 +172,17 @@ test("aspect classification distinguishes exact, rounding, and changed ratios", 
   assert.ok(ratioErrorPercent("4096x2160", "3840x2016") < 1);
 });
 
-test("variant reference-image 502 stays transient rather than unsupported", () => {
-  const explanation = explainCapability({
-    models,
-    model: "gpt-image-2-low",
-    size: "1024x1024",
-    hasReferenceImage: true,
-  });
-  assert.equal(explanation.expectedStatus, "transient_failure");
-  assert.ok(explanation.cautions.includes("transient_http_failure_is_not_unsupported"));
+
+test("ambiguous catalogs never choose a preferred vendor model", () => {
+  assert.equal(selectModel({ models, size: "3840x2160" }).model, null);
+  assert.equal(selectModel({ models, hasReferenceImage: true }).model, null);
+  assert.equal(selectModel({ models: ["flux-art", "text-only"] }).model, "flux-art");
+  assert.equal(selectModel({ models, configuredModel: "my-deployment" }).model, "my-deployment");
+});
+
+test("no capability observations are bundled for unrelated connections", () => {
+  const result = explainCapability({ model: "gpt-image-2", size: "1024x1024", count: 2 });
+  assert.equal(result.expectedStatus, "unknown");
+  assert.equal(result.expectedCountStatus, "unknown");
+  assert.deepEqual(result.evidence, []);
 });

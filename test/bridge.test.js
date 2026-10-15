@@ -35,13 +35,14 @@ function makePng(width = 1, height = 1) {
 }
 
 async function tempRoot(t) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "wawapi-image-mcp-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "universal-image-mcp-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   return root;
 }
 
 function config(outputDir, key = "test-secret-123456789") {
   return {
+    model: "gpt-image-2",
     apiKey: key,
     apiKeyPresent: Boolean(key),
     authSource: key ? "env" : "missing",
@@ -88,7 +89,7 @@ test("doctor reports DNS diagnostics as a non-blocking catalog warning", async (
     catalogRetryDelayMs: 0,
     fetchImpl: async () => {
       calls += 1;
-      const cause = Object.assign(new Error("getaddrinfo ENOTFOUND wawapii.com"), { code: "ENOTFOUND" });
+      const cause = Object.assign(new Error("getaddrinfo ENOTFOUND provider.example"), { code: "ENOTFOUND" });
       const error = new TypeError("fetch failed");
       error.cause = cause;
       throw error;
@@ -153,7 +154,7 @@ test("offline doctor validates local readiness without claiming remote availabil
   assert.equal(result.data.checks.endpoint.reason, "catalog_probe_disabled");
 });
 
-test("generation auto-selects the high variant and saves only text-addressable metadata", async (t) => {
+test("generation honors the configured model and saves only text-addressable metadata", async (t) => {
   const root = await tempRoot(t);
   const image = makePng(2048, 2048);
   const calls = [];
@@ -177,18 +178,17 @@ test("generation auto-selects the high variant and saves only text-addressable m
     quality: "low",
     format: "png",
     output: path.join(root, "result.png"),
-    preferAsyncImages: false,
   }, { fetchImpl: fakeFetch });
 
   assert.equal(result.ok, true);
-  assert.equal(result.data.request.model, "gpt-image-2-high");
-  assert.equal(result.data.capability.selectionReason, "high_resolution_prefers_exact_variant");
+  assert.equal(result.data.request.model, "gpt-image-2");
+  assert.equal(result.data.capability.selectionReason, "configured_model");
   assert.equal(result.data.result.status, "exact");
   assert.equal(result.data.result.images[0].size, "2048x2048");
   assert.match(result.data.result.images[0].markdown, /^!\[generated image\]\(<.+>\)$/);
   assert.equal("b64_json" in result.data.result.images[0], false);
   assert.equal(calls.filter((call) => call.url.endsWith("/models")).length, 1);
-  assert.equal(JSON.parse(calls.at(-1).options.body).model, "gpt-image-2-high");
+  assert.equal(JSON.parse(calls.at(-1).options.body).model, "gpt-image-2");
 });
 
 test("silent provider degradation is classified with proportional evidence", async (t) => {
@@ -211,7 +211,6 @@ test("silent provider degradation is classified with proportional evidence", asy
     model: "gpt-image-2",
     size: "2048x2048",
     output: root,
-    preferAsyncImages: false,
   }, { fetchImpl: fakeFetch });
 
   assert.equal(result.data.result.status, "degraded");
@@ -242,7 +241,6 @@ test("generation continues when the model catalog misreports channel unavailabil
   const result = await generateImage(config(root), {
     prompt: "catalog false positive",
     output: root,
-    preferAsyncImages: false,
   }, { fetchImpl: fakeFetch, catalogRetryDelayMs: 0 });
 
   assert.equal(catalogCalls, 2);
@@ -277,12 +275,11 @@ test("variant reference route false prompt errors get an actionable code", async
       model: "gpt-image-2-high",
       reference: referencePath,
       output: root,
-      preferAsyncImages: false,
     }, { fetchImpl: fakeFetch }),
     (error) => {
       assert.equal(error.code, "reference_request_misparsed");
       assert.equal(error.details.prompt_was_sent, true);
-      assert.match(error.nextActions[0], /gpt-image-2/);
+      assert.match(error.nextActions[0], /Multipart/);
       return true;
     },
   );
@@ -334,7 +331,6 @@ test("reference input validation never reaches the upstream for invalid files", 
       prompt: "local validation",
       reference: invalidPath,
       output: root,
-      preferAsyncImages: false,
     }, { fetchImpl: fakeFetch }),
     (error) => {
       assert.equal(error.code, "invalid_reference_image");
@@ -358,7 +354,6 @@ test("reference input validation reports a missing file without leaking ENOENT",
       prompt: "missing reference",
       reference: path.join(root, "missing.png"),
       output: root,
-      preferAsyncImages: false,
     }, { fetchImpl: fakeFetch }),
     (error) => {
       assert.equal(error.code, "reference_image_not_found");
@@ -393,7 +388,7 @@ test("channel-unavailable errors retain stable MCP guidance", async (t) => {
       const envelope = errorEnvelope("generate_image", error);
       assert.equal(envelope.error.code, "upstream_channel_unavailable");
       assert.equal(envelope.error.retryable, true);
-      assert.equal(envelope.error.attempts, 2);
+      assert.equal(envelope.error.attempts, 1);
       assert.equal(envelope.error.diagnostics.phase, "generation_submit");
       assert.equal(envelope.error.diagnostics.target, "/images/generations");
       assert.match(envelope.next_actions.join("\n"), /Key提供方/);
@@ -401,7 +396,7 @@ test("channel-unavailable errors retain stable MCP guidance", async (t) => {
       return true;
     },
   );
-  assert.equal(calls, 3);
+  assert.equal(calls, 2);
 });
 
 test("invalid keys stop before a generation request", async (t) => {
