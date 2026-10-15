@@ -59,7 +59,7 @@
     "zod": "3.25.76"
   },
   "overrides": {
-    "hono": "4.13.5"
+    "hono": "4.13.13"
   },
   "bundleDependencies": [
     "@modelcontextprotocol/sdk",
